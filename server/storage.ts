@@ -1,6 +1,4 @@
-import { db } from "./db";
-import { savedLooks, type InsertSavedLook, type SavedLook } from "@shared/schema";
-import { eq } from "drizzle-orm";
+import { type InsertSavedLook, type SavedLook } from "@shared/schema";
 
 export interface IStorage {
   getLooks(): Promise<SavedLook[]>;
@@ -8,19 +6,33 @@ export interface IStorage {
   deleteLook(id: number): Promise<void>;
 }
 
-export class DatabaseStorage implements IStorage {
+export class MemStorage implements IStorage {
+  private looks: Map<number, SavedLook>;
+  private currentId: number;
+
+  constructor() {
+    this.looks = new Map();
+    this.currentId = 1;
+  }
+
   async getLooks(): Promise<SavedLook[]> {
-    return await db.select().from(savedLooks).orderBy(savedLooks.createdAt);
+    return Array.from(this.looks.values());
   }
 
   async createLook(look: InsertSavedLook): Promise<SavedLook> {
-    const [newLook] = await db.insert(savedLooks).values(look).returning();
+    const id = this.currentId++;
+    const newLook: SavedLook = {
+      ...look,
+      id,
+      createdAt: new Date(),
+    };
+    this.looks.set(id, newLook);
     return newLook;
   }
 
   async deleteLook(id: number): Promise<void> {
-    await db.delete(savedLooks).where(eq(savedLooks.id, id));
+    this.looks.delete(id);
   }
 }
 
-export const storage = new DatabaseStorage();
+export const storage = new MemStorage();
